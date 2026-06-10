@@ -4,7 +4,7 @@ from . import _perlin
 
 XYSCALEBASE = 100
 
-def filter_frames(im, filt, *args):
+def filter_frames(im, filt, frame_index, *args):
     """Apply a filter/transformation to an image batch
 
     Parameters
@@ -40,16 +40,22 @@ def filter_frames(im, filt, *args):
     if filt == "photodiode":
         im = im.copy()
         s = args[0]
-        im[:s,-s:,::2] = 0
-        im[:s,-s:,1::2] = 1
+        # Check if the current frame index is even or odd
+        if frame_index % 2 == 0:
+            im[:s,-s:,:] = 0 # Black on even frames
+        else:
+            im[:s,-s:,:] = 1 # White on odd frames
         return im
     if filt == "photodiode_anywhere":
         im = im.copy()
         x = args[0]
         y = args[1]
         s = args[2]
-        im[y:(y+s),x:(x+s),::2] = 0
-        im[y:(y+s),x:(x+s),1::2] = 1
+        
+        if frame_index % 2 == 0:
+            im[y:(y+s),x:(x+s),:] = 0
+        else:
+            im[y:(y+s),x:(x+s),:] = 1
         return im
     if filt == "photodiode_b2":
         im = im.copy()
@@ -73,7 +79,7 @@ def filter_frames(im, filt, *args):
         return filt(im)
     raise ValueError("Invalid filter specified")
 
-def apply_filters(arr, filters):
+def apply_filters(arr, filters, frame_index=None):
     for f in filters:
         if isinstance(f, str):
             n = f
@@ -81,7 +87,7 @@ def apply_filters(arr, filters):
         else:
             n = f[0]
             args = f[1:]
-        arr = filter_frames(arr, n, *args)
+        arr = filter_frames(arr, n, frame_index, *args)
     return arr
 
 
