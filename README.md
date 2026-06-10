@@ -47,13 +47,13 @@ pip install zebranoise
 
 ### Installation from Source
 
-If you plan to modify the package source code, your system must have a C compiler installed to build the package from source because the core engine is written in C for performance.
+Because the core engine is written in C for performance, your system must have a C compiler installed to build the package from source.
 
 * **Linux:** Ensure `gcc` is installed.
 * **Windows:** You must install the **Microsoft C++ Build Tools** (available via the Visual Studio Installer) with the "Desktop development with C++" workload selected.
 
 **Modern Environments (Recommended)**
-Modern versions of `pip` automatically provision a build environment and fetch necessary dependencies (like Cython) in the background. Once your compiler is ready, run the following in the repository root directory:
+Modern versions of `pip` automatically provision a build environment and fetch necessary dependencies (like Cython) in the background. Once your compiler is ready, run:
 
 ```bash
 pip install .
@@ -69,8 +69,9 @@ python setup.py install
 
 ```
 
-**Cloning the Repository**
-Clone the repository and install it in "editable" mode. This allows your changes to reflect immediately without needing to reinstalling every time you edit the code:
+### Development Installation
+
+If you plan to modify the package source code, clone the repository and install it in "editable" mode. This allows your changes to reflect immediately without needing to reinstall:
 
 ```bash
 pip install -e .
