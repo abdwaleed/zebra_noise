@@ -4,7 +4,7 @@ from . import _perlin
 
 XYSCALEBASE = 100
 
-def filter_frames(im, filt, frame_index, *args):
+def filter_frames(im, filt, *args, frame_index):
     """Apply a filter/transformation to an image batch
 
     Parameters
@@ -42,9 +42,9 @@ def filter_frames(im, filt, frame_index, *args):
         s = args[0]
         # Check if the current frame index is even or odd
         if frame_index % 2 == 0:
-            im[:s,-s:,:] = 0 # Black on even frames
+            im[..., :s,-s:,:] = 1 # White on even frames
         else:
-            im[:s,-s:,:] = 1 # White on odd frames
+            im[..., :s,-s:,:] = 0 # Black on odd frames
         return im
     if filt == "photodiode_anywhere":
         im = im.copy()
@@ -53,9 +53,9 @@ def filter_frames(im, filt, frame_index, *args):
         s = args[2]
         
         if frame_index % 2 == 0:
-            im[y:(y+s),x:(x+s),:] = 0
+            im[..., y:(y+s),x:(x+s),:] = 1 # White on even frames
         else:
-            im[y:(y+s),x:(x+s),:] = 1
+            im[..., y:(y+s),x:(x+s),:] = 0 # Black on odd frames
         return im
     if filt == "photodiode_b2":
         im = im.copy()
@@ -87,7 +87,7 @@ def apply_filters(arr, filters, frame_index=None):
         else:
             n = f[0]
             args = f[1:]
-        arr = filter_frames(arr, n, frame_index, *args)
+        arr = filter_frames(arr, n, *args, frame_index=frame_index)
     return arr
 
 

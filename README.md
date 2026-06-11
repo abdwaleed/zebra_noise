@@ -6,12 +6,68 @@ Zebranoise is a high-performance Python library designed to generate "zebra nois
 
 [![Example zebra noise](http://img.youtube.com/vi/-SyjgbNCP4Q/0.jpg)](http://www.youtube.com/watch?v=-SyjgbNCP4Q "Example zebra noise")
 
-## Quick Start
+**PRENOTE**: please be sure to read the notes described in the **Filters & Photodiode Support** section below to avoid any errors.
 
-The `easy.py` module provides a simplified interface to generate a standard zebra noise video and output it directly to an `.mp4` file.
+## Installation
 
-Create a Python script and use the following code to generate a stimulus:
+### Standard Installation
 
+Install the pre-compiled package directly from PyPI:
+
+```bash
+pip install zebranoise
+```
+
+Then use the code below:
+#### Example Code
+```python
+import zebranoise
+zebranoise.zebra_noise(
+    output_file="zebra.mp4", 
+    xsize=1280, 
+    ysize=720, 
+    tdur=60*10,           # Duration in seconds (10 minutes)
+    tscale=50,          # Temporal speed (higher is slower)
+    xyscale=0.2,        # Spatial scale (closer to 0 is smoother, closer to 1 is choppier)
+    fps=30, 
+    seed=0, 
+    filters=[
+        ("comb", 0.08), 
+        # ("photodiode_anywhere", 0, 0, 140) # Photodiode Support
+    ]
+)
+```
+
+> **Important Note on Filters:** The `zebra_noise` function defaults to `filters=[("comb", 0.08)]` to generate the signature zebra pattern. If you pass a custom list to the `filters` parameter (e.g., to add a photodiode), it will completely overwrite the default list. You **must** explicitly include `("comb", 0.08)`, with any desired comb value, in your new list to retain the zebra visual effect.
+
+### Installation from Source
+
+Because the core engine is written in C for performance, your system must have a C compiler installed to build the package from source.
+
+* **Linux:** Ensure `gcc` is installed.
+* **Windows:** You must install the **Microsoft C++ Build Tools** (available via the Visual Studio Installer) with the "Desktop development with C++" workload selected.
+
+Then proceed to clone the repository. More information is available on [GitHub](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository).
+
+For this next step, ensure you are working within the repository's root folder.
+
+**Modern Environments (Recommended)**
+Modern versions of `pip` automatically provision a build environment and fetch necessary dependencies (like Cython) in the background. Once your compiler is ready, run:
+
+```bash
+pip install .
+```
+
+**Legacy Environments**
+If you are using an older Python environment or an outdated version of `pip` that does not support isolated builds, you must manually install Cython before invoking the legacy setup script:
+
+```bash
+pip install cython
+python setup.py install
+```
+
+Finally, use the code below:
+#### Example Code
 ```python
 from zebranoise import easy
 
@@ -26,89 +82,68 @@ easy.zebra_noise(
     seed=0, 
     filters=[
         ("comb", 0.08), 
-        ("photodiode_anywhere", 0, 0, 140)
+        # ("photodiode_anywhere", 0, 0, 140) # Photodiode Support
     ]
 )
-
 ```
 
-> **Important Note on Filters:** The `zebra_noise` function defaults to `filters=[("comb", 0.08)]` to generate the signature zebra pattern. If you pass a custom list to the `filters` parameter (e.g., to add a photodiode), it will completely overwrite the default list. You **must** explicitly include `("comb", 0.08)` in your new list to retain the zebra visual effect.
+### Developer Installation
 
-## Installation
-
-### Standard Installation
-
-Install the pre-compiled package directly from PyPI:
-
-```bash
-pip install zebranoise
-
-```
-
-### Installation from Source
-
-Because the core engine is written in C for performance, your system must have a C compiler installed to build the package from source.
-
-* **Linux:** Ensure `gcc` is installed.
-* **Windows:** You must install the **Microsoft C++ Build Tools** (available via the Visual Studio Installer) with the "Desktop development with C++" workload selected.
-
-**Modern Environments (Recommended)**
-Modern versions of `pip` automatically provision a build environment and fetch necessary dependencies (like Cython) in the background. Once your compiler is ready, run:
-
-```bash
-pip install .
-
-```
-
-**Legacy Environments**
-If you are using an older Python environment or an outdated version of `pip` that does not support isolated builds, you must manually install Cython before invoking the legacy setup script:
-
-```bash
-pip install cython
-python setup.py install
-
-```
-
-### Development Installation
-
-If you plan to modify the package source code, clone the repository and install it in "editable" mode. This allows your changes to reflect immediately without needing to reinstall:
+If you plan to modify the package source code, clone the repository and follow the same steps in the **Installation from Source** section **BUT** install the repository in "editable" mode instead (pip command below). Use the same example code too:
 
 ```bash
 pip install -e .
-
 ```
 
 ## Advanced Usage
 
-For researchers generating highly complex stimuli or those needing to apply filters iteratively without regenerating the base noise, use the `PerlinStimulus` class.
+This package can be used to generate new stimuli based on Perlin noise.
 
 > **Warning: Disk Space Requirements**
-> The `PerlinStimulus` class caches large, uncompressed numpy arrays to your hard drive to optimize RAM usage. It creates a `perlcache/` directory in your working folder and utilizes your system's temporary directory. Ensure you have ample free disk space (tens to hundreds of gigabytes) before generating long or high-resolution videos.
+> The program will cache large, uncompressed numpy arrays to your hard drive to optimize RAM usage. It creates a `perlcache/` directory in your working folder and utilizes your system's temporary directory. Ensure you have ample free disk space (tens to hundreds of gigabytes) before generating long or high-resolution videos.
 
+To generate a Perlin noise-based video, follow the steps in the 2 code blocks below:
+
+### Step 1: Generate the raw 3D noise matrix and cache it to disk
 ```python
 import zebranoise
 
 # Step 1: Generate the raw 3D noise matrix and cache it to disk
-stim = zebranoise.PerlinStimulus(
-    xsize=480, 
-    ysize=128, 
+noise_stim = zebranoise.PerlinStimulus(
+    xsize=400, 
+    ysize=100, 
     tdur=60*5,        # 5 minutes
     xyscale=0.2, 
     tscale=50
 )
+```
 
+See the function documentation for **perlstim.Perl** for more information about modifying the properties of the noise.
+
+### Step 2: Apply filters and render the final MP4
+```python
 # Step 2: Apply filters and render the final MP4
-stim.save_video(
+noise_stim.save_video(
     "perlin_stimulus.mp4", 
     loop=1, 
     filters=[("comb", 0.08), ("photodiode", 30)]
 )
-
 ```
+
+See the **Filters & Photodiode Support** section below for more information about filters.
 
 ## Filters & Photodiode Support
 
-Filters modify the raw Perlin noise to create distinct visual patterns or add synchronization metadata for laboratory recording hardware. Provide filters as a list of strings (for filters with no arguments) or tuples (for filters requiring arguments).
+Filters modify the raw Perlin noise to create distinct visual patterns or add photodiode patches for lab hardware synchronization. 
+
+**NOTE:** Provide filters as a list with strings for filters with no arguments and tuples for filters requiring arguments.Example:
+
+> **Important Note on Filters:** The `zebra_noise` function defaults to `filters=[("comb", 0.08)]` to generate the signature zebra pattern. If you pass a custom list to the `filters` parameter (e.g., to add a photodiode), it will completely overwrite the default list. You **must** explicitly include `("comb", 0.08)`, with any desired comb value, in your new list to retain the zebra visual effect.
+
+```python
+# Applies the "reverse" filter (with no arguments) and the "comb" filter with the argument .05
+noise.save_video("noise.mp4", filters=["reverse", ("comb", .05)])
+```
 
 ### Pattern Filters
 
@@ -133,4 +168,4 @@ Filters modify the raw Perlin noise to create distinct visual patterns or add sy
 
 ## Credits
 
-Portions of the optimized C code (`_perlin.c`) are based on Casey Duncan's `noise` package for Python, distributed under the MIT license. Modified and expanded for video stimulus generation by Max Shinn.
+Portions of the optimized C code (`_perlin.c`) are based on [Casey Duncan's `noise` package for Python](https://github.com/caseman/noise), distributed under the MIT license. Modified and expanded for video stimulus generation by Max Shinn.
