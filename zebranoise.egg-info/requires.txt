@@ -1,4 +1,0 @@
-numpy
-imageio
-imageio-ffmpeg
-tqdm

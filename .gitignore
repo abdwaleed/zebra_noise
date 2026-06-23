@@ -1,4 +1,12 @@
+# Python cache
+__pycache__/
 zebranoise/__pycache__/
-zebranoise/_perlin.cp313-win_amd64.pyd/
+
+# Compiled C extensions / binaries (Windows, Linux, Mac)
+*.pyd
+*.so
+*.dylib
+
+# Build metadata
+*.egg-info/
 zebranoise.egg-info/
-zebranoise.py/
