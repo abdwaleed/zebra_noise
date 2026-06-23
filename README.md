@@ -15,30 +15,34 @@ Zebranoise is a high-performance Python library designed to generate "zebra nois
 Install the pre-compiled package directly from PyPI:
 
 ```bash
-pip install git+https://github.com/abdwaleed/zebra_noise.git
+pip install git+[https://github.com/abdwaleed/zebra_noise.git](https://github.com/abdwaleed/zebra_noise.git)
 ```
 
 Then use the code below:
 #### Example Code
 ```python
 import zebranoise
-zebranoise.zebra_noise(
-    output_file="zebra.mp4", 
-    xsize=1280, 
-    ysize=720, 
-    tdur=60*10,           # Duration in seconds (10 minutes)
-    tscale=50,          # Temporal speed (higher is slower)
-    xyscale=0.2,        # Spatial scale (closer to 0 is smoother, closer to 1 is choppier)
-    fps=30, 
-    seed=0, 
-    filters=[
-        ("comb", 0.08), 
-        # ("photodiode_anywhere", 0, 0, 140) # Photodiode Support
-    ]
-)
+
+if __name__ == "__main__":
+    zebranoise.zebra_noise(
+        output_file="zebra.mp4", 
+        xsize=1280, 
+        ysize=720, 
+        tdur=60*10,           # Duration in seconds (10 minutes)
+        tscale=50,          # Temporal speed (higher is slower)
+        xyscale=0.2,        # Spatial scale (closer to 0 is smoother, closer to 1 is choppier)
+        fps=30, 
+        seed=0, 
+        filters=[
+            ("comb", 0.08), 
+            # ("photodiode_anywhere", 0, 0, 140) # Photodiode Support
+        ]
+    )
 ```
 
 > **Important Note on Filters:** The `zebra_noise` function defaults to `filters=[("comb", 0.08)]` to generate the signature zebra pattern. If you pass a custom list to the `filters` parameter (e.g., to add a photodiode), it will completely overwrite the default list. You **must** explicitly include `("comb", 0.08)`, with any desired comb value, in your new list to retain the zebra visual effect.
+
+> **Important Note for Windows Users**: `if __name__ == "__main__":` must be included for the `multiprocessing` Python module to not throw an error. 
 
 ### Installation from Source
 
@@ -167,5 +171,7 @@ noise.save_video("noise.mp4", filters=["reverse", ("comb", .05)])
 * **`"photodiode_b2"`** / **`"photodiode_fusi"`** / **`"photodiode_bscope"`**: Pre-configured sync squares tailored for specific rig setups.
 
 ## Credits
+
+This repository is a fork of the original `zebra_noise` package developed by Max Shinn, modified and maintained by Abdelrahman A.
 
 Portions of the optimized C code (`_perlin.c`) are based on [Casey Duncan's `noise` package for Python](https://github.com/caseman/noise), distributed under the MIT license. Modified and expanded for video stimulus generation by Max Shinn.
