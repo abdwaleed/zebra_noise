@@ -60,20 +60,26 @@ def filter_frames(im, filt, *args, frame_index):
     if filt == "photodiode_b2":
         im = im.copy()
         s = 125
-        im[:s,-s:,::2] = 0
-        im[:s,-s:,1::2] = 1
+        if frame_index % 2 == 0:
+            im[..., y:(y+s),x:(x+s),:] = 1 # White on even frames
+        else:
+            im[..., y:(y+s),x:(x+s),:] = 0 # Black on odd frames
         return im
     if filt == "photodiode_fusi":
         im = im.copy()
         s = 75
-        im[:s,-s:,::2] = 0
-        im[:s,-s:,1::2] = 1
+        if frame_index % 2 == 0:
+            im[..., y:(y+s),x:(x+s),:] = 1 # White on even frames
+        else:
+            im[..., y:(y+s),x:(x+s),:] = 0 # Black on odd frames
         return im
     if filt == "photodiode_bscope":
         im = im.copy()
         s = 100
-        im[-s:,:s,::2] = 0
-        im[-s:,:s,1::2] = 1
+        if frame_index % 2 == 0:
+            im[..., y:(y+s),x:(x+s),:] = 1 # White on even frames
+        else:
+            im[..., y:(y+s),x:(x+s),:] = 0 # Black on odd frames
         return im
     if callable(filt):
         return filt(im)
