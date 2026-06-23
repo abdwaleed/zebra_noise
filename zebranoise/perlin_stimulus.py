@@ -1,7 +1,10 @@
+# This code version is a computationally optimized version of the original
 import hashlib
 import os
 import warnings
 import tempfile
+import gc # Added for strict memory management
+from concurrent.futures import ThreadPoolExecutor # Added for I/O parallelization
 from subprocess import call
 from pathlib import Path
 import numpy as np
@@ -137,25 +140,14 @@ class PerlinStimulus:
         return arr.squeeze()
 
     def generate_batch(self):
-        """Create the stimulus
-
-        Runs the _perlin C module and saves the output in batches.
-
-        If this function has already been run before and has been cached on the
-        filesytem, automatically load the statistics from it.  Otherwise,
-        generate the stimuli and cache them.
-        """
-        # If the cache already exists, load the statistics (used for
-        # normalisation) and exit immediately.
+        """Create the stimulus (Optimized for RAM usage)"""
         if os.path.isfile(self.cache_filename("stats")):
             stats = np.load(self.cache_filename("stats"))
             self.min_ = stats['min_']
             self.max_ = stats['max_']
             self.nframes = stats['nframes']
             return
-        # Generate the stimuli and save the means and mins/maxes.  If we are
-        # demeaning across space, we won't end up using the mins or maxes saved
-        # here.
+
         means_t = []
         means_xy = []
         weights = []
@@ -174,12 +166,14 @@ class PerlinStimulus:
             means_t.append(np.mean(arr, axis=2))
             weights.append(arr.shape[2])
             np.save(self.cache_filename(k), arr.astype("float16"))
+            
+            # Explicit memory wipe
             del arr
-        # Compute the spatial mean (across t)
+            gc.collect()
+
         mean_t = np.sum(means_t*(np.asarray(weights)[:,None,None]), axis=0)/np.sum(weights)
         nframes = np.sum(weights)
-        # Optionally remove the spatial mean.  If so, iterate through and
-        # update all of the saved data files to remove the spatial mean.
+
         if self.demean in ["both", "space"]:
             k = 0
             mins = []
@@ -190,15 +184,19 @@ class PerlinStimulus:
                 mins.append(np.min(arr))
                 maxes.append(np.max(arr))
                 np.save(self.cache_filename(k), arr.astype("float16"))
+                
+                # Explicit memory wipe
                 del arr
+                gc.collect()
                 k += 1
+
         min_ = np.min(mins)
         max_ = np.max(maxes)
-        # Save the mins and maxes.
         np.savez_compressed(self.cache_filename("stats"), min_=min_, max_=max_, nframes=nframes)
         self.min_ = min_
         self.max_ = max_
         self.nframes = nframes
+    
     def save_grey_pad(self, fn, dur, bitrate=20):
         """Create a grey screen video which can be used to pad"""
         one_frame = np.load(self.cache_filename(0), mmap_mode='r')[:,:,0].astype('uint8') * 0 + 127
@@ -212,39 +210,25 @@ class PerlinStimulus:
         for p in self.tmpdir.glob("_frame*.tif"):
             p.unlink()
         self.tmpdir.joinpath("_grey.tif").unlink()
+    
     def save_video(self, fn, loop=1, filters=[], bitrate=20, codec="mpeg2video", codec_args=[]):
-        """Save the filtered stimulus.
-
-        Parameters
-        ----------
-        fn : str
-            The file name to save the video
-        loop : int > 0
-            The number of times the stimulus should loop in the saved video
-        filters : list of str and/or (str, ...) tuples
-            A list of filters to apply to the stimulus.  If a filter requires
-            parameters, pass a tuple, where the first element is the name of
-            the filter and the subsequent elements are the parameters.
-        bitrate : int > 0
-            The bitrate in megabits per second.  The default is good for binary
-            videos and pure noise, but a higher value may be necessary if
-            using the "wood" filter.
-        codec : str
-            The name of the codec to use in ffmpeg
-        codec_args : list of str
-            Additional command line arguments to pass to ffmpeg when rendering
-        """
+        """Save the filtered stimulus (Optimized via I/O multithreading)."""
         if Path(fn).exists():
             raise IOError("Output video file already exists!")
         i = 0
         k = 0
         filtind = filter_frames_index_function(filters, nframes=self.nframes)
+        
+        # Helper function for threading
+        def _write_tiff(frame_data, index):
+            out_path = self.tmpdir.joinpath(f"_frame{filtind(index):05}.tif")
+            imageio.imsave(out_path, frame_data, format="pillow", compression="tiff_adobe_deflate")
+
         while os.path.isfile(self.cache_filename(k)):
             data = np.load(self.cache_filename(k)).astype("float32")
-            # Renormalise using precomputed mins/maxes
             data -= self.min_
             data *= 1/(self.max_-self.min_)
-            # Apply filters
+            
             for f in filters:
                 if isinstance(f, str):
                     n = f
@@ -253,17 +237,33 @@ class PerlinStimulus:
                     n = f[0]
                     args = f[1:]
                 data = filter_frames(data, n, *args)
+            
             data = discretize(data)
             assert data.dtype == 'uint8'
-            for j in range(0, data.shape[2]):
-                imageio.imsave(self.tmpdir.joinpath(f"_frame{filtind(i):05}.tif"), data[:,:,j], format="pillow", compression="tiff_adobe_deflate")
-                i += 1
+            
+            # --- PARALLEL I/O OPTIMIZATION ---
+            with ThreadPoolExecutor() as executor:
+                futures = []
+                for j in range(0, data.shape[2]):
+                    # Submit disk writes to threads to parallelize compression and I/O
+                    futures.append(executor.submit(_write_tiff, data[:,:,j], i))
+                    i += 1
+                
+                # Ensure all frames for this batch finish before loading the next
+                for future in futures:
+                    future.result()
+            # ---------------------------------
+            
             k += 1
             del data
+            gc.collect() # Strict RAM management per batch
+
         n_frames = i
         for j in range(1, loop):
             for i in range(0, n_frames):
                 os.link(self.tmpdir.joinpath(f"_frame{i:05}.tif"), self.tmpdir.joinpath(f"_frame{(i+j*n_frames):05}.tif"))
-        call([get_ffmpeg_exe(), "-r", str(self.fps), "-i", str(self.tmpdir.joinpath("_frame%5d.tif")), "-c:v", codec, "-an", "-b:v", f"{bitrate}M"] + codec_args +[fn])
+                
+        call([get_ffmpeg_exe(), "-r", str(self.fps), "-i", str(self.tmpdir.joinpath("_frame%5d.tif")), "-c:v", codec, "-an", "-b:v", f"{bitrate}M"] + codec_args + [fn])
+        
         for p in self.tmpdir.glob("_frame*.tif"):
             p.unlink()
