@@ -15,7 +15,7 @@ Zebranoise is a high-performance Python library designed to generate "zebra nois
 Install the pre-compiled package directly from PyPI:
 
 ```bash
-pip install zebranoise
+pip install git+https://github.com/abdwaleed/zebra_noise.git
 ```
 
 Then use the code below:
