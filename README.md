@@ -10,6 +10,11 @@ Zebranoise is a high-performance Python library designed to generate "zebra nois
 
 ## Installation
 
+Because the core engine is written in C for maximum performance, your system **must have a C compiler installed** to build the package on your machine.
+
+* **Linux:** Ensure `gcc` is installed.
+* **Windows:** You must install the **Microsoft C++ Build Tools** (available via the Visual Studio Installer) with the "Desktop development with C++" workload selected.
+
 ### Standard Installation
 
 Install the pre-compiled package directly from PyPI:
@@ -46,12 +51,7 @@ if __name__ == "__main__":
 
 ### Installation from Source
 
-Because the core engine is written in C for performance, your system must have a C compiler installed to build the package from source.
-
-* **Linux:** Ensure `gcc` is installed.
-* **Windows:** You must install the **Microsoft C++ Build Tools** (available via the Visual Studio Installer) with the "Desktop development with C++" workload selected.
-
-Then proceed to clone the repository. More information is available on [GitHub](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository).
+Proceed to clone the repository. More information is available on [GitHub](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository).
 
 For this next step, ensure you are working within the repository's root folder.
 
