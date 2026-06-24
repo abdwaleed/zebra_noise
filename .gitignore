@@ -10,3 +10,5 @@ zebranoise/__pycache__/
 # Build metadata
 *.egg-info/
 zebranoise.egg-info/
+
+zebranoise.py

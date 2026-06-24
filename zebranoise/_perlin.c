@@ -136,7 +136,9 @@ make_perlin(PyObject *self, PyObject *args, PyObject *kwargs)
   }
 
 	if (octaves == 1) {
-		// Single octave, return simple noise
+    // Single octave, return simple noise
+    // OpenMP Pragma: Splits the outer 'i' loop across CPU cores
+    #pragma omp parallel for private(j, k)
     for (i=0; i<len_x; i++) {
       for (j=0; j<len_y; j++) {
         for (k=0; k<len_z; k++) {
@@ -145,7 +147,10 @@ make_perlin(PyObject *self, PyObject *args, PyObject *kwargs)
         }
       }
     }
-	} else if (octaves > 1) {
+  } else if (octaves > 1) {
+    // Multi-octave generation
+    // OpenMP Pragma: Declares j, k, l as private so threads don't overwrite each other
+    #pragma omp parallel for private(j, k, l)
     for (i=0; i<len_x; i++) {
       for (j=0; j<len_y; j++) {
         for (k=0; k<len_z; k++) {
@@ -165,10 +170,10 @@ make_perlin(PyObject *self, PyObject *args, PyObject *kwargs)
         }
       }
     }
-	} else {
-		PyErr_SetString(PyExc_ValueError, "Expected octaves value > 0");
-		return NULL;
-	}
+  } else {
+    PyErr_SetString(PyExc_ValueError, "Expected octaves value > 0");
+    return NULL;
+  }
   npy_intp dims[3] = { len_x, len_y, len_z };
   PyObject *retarray = PyArray_SimpleNewFromData(3, dims, NPY_FLOAT, ret);
   PyArray_ENABLEFLAGS((PyArrayObject*)retarray, NPY_ARRAY_OWNDATA);

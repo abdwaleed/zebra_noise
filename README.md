@@ -14,6 +14,7 @@ Because the core engine is written in C for maximum performance, your system **m
 
 * **Linux:** Ensure `gcc` is installed.
 * **Windows:** You must install the **Microsoft C++ Build Tools** (available via the Visual Studio Installer) with the "Desktop development with C++" workload selected.
+* **Mac:** Run `xcode-select --install` and click Install.
 
 ### Standard Installation
 

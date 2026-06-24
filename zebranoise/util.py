@@ -24,7 +24,13 @@ def filter_frames(im, filt, *args, frame_index):
     if filt == "threshold":
         return (im>args[0]).astype(np.float32)
     if filt == "softthresh":
-        return 1/(1+np.exp(-args[0]*(im-.5)))
+        # Pre-allocate one array, then perform all math in-place to prevent RAM spikes
+        res = np.subtract(im, 0.5)
+        np.multiply(res, -args[0], out=res)
+        np.exp(res, out=res)
+        np.add(res, 1.0, out=res)
+        np.divide(1.0, res, out=res)
+        return res
     if filt == "comb":
         return (im//args[0] % 2 == 1).astype(np.float32)
     if filt == "invert":
@@ -32,54 +38,49 @@ def filter_frames(im, filt, *args, frame_index):
     if filt == "reverse":
         return im # We need to use filter_index_function for this
     if filt == "blur":
-        return np.asarray([scipy.ndimage.filters.gaussian_filter(im.astype(np.float32)[:,:,i], args[0], mode='wrap') for i in range(0, im.shape[2])]).transpose([1,2,0])
+        # Vectorized in C: Blurs X and Y (sigma=args[0]), ignores Time axis (sigma=0).
+        return scipy.ndimage.gaussian_filter(im, sigma=(args[0], args[0], 0), mode='wrap')
     if filt == "wood":
         return (im % args[0]) / args[0]
     if filt == "center":
         return 1-(np.abs(im-.5)*2)
     if filt == "photodiode":
-        im = im.copy()
         s = args[0]
-        # Check if the current frame index is even or odd
         if frame_index % 2 == 0:
-            im[..., :s,-s:,:] = 1 # White on even frames
+            im[..., :s, -s:, :] = 1 
         else:
-            im[..., :s,-s:,:] = 0 # Black on odd frames
+            im[..., :s, -s:, :] = 0 
         return im
     if filt == "photodiode_anywhere":
-        im = im.copy()
         x = args[0]
         y = args[1]
         s = args[2]
         
         if frame_index % 2 == 0:
-            im[..., y:(y+s),x:(x+s),:] = 1 # White on even frames
+            im[..., y:(y+s),x:(x+s),:] = 1
         else:
-            im[..., y:(y+s),x:(x+s),:] = 0 # Black on odd frames
+            im[..., y:(y+s),x:(x+s),:] = 0
         return im
     if filt == "photodiode_b2":
-        im = im.copy()
         s = 125
         if frame_index % 2 == 0:
-            im[..., y:(y+s),x:(x+s),:] = 1 # White on even frames
+            im[..., :s, -s:, :] = 1 
         else:
-            im[..., y:(y+s),x:(x+s),:] = 0 # Black on odd frames
+            im[..., :s, -s:, :] = 0 
         return im
     if filt == "photodiode_fusi":
-        im = im.copy()
         s = 75
         if frame_index % 2 == 0:
-            im[..., y:(y+s),x:(x+s),:] = 1 # White on even frames
+            im[..., :s, -s:, :] = 1 
         else:
-            im[..., y:(y+s),x:(x+s),:] = 0 # Black on odd frames
+            im[..., :s, -s:, :] = 0 
         return im
     if filt == "photodiode_bscope":
-        im = im.copy()
         s = 100
         if frame_index % 2 == 0:
-            im[..., y:(y+s),x:(x+s),:] = 1 # White on even frames
+            im[..., :s, -s:, :] = 1 
         else:
-            im[..., y:(y+s),x:(x+s),:] = 0 # Black on odd frames
+            im[..., :s, -s:, :] = 0 
         return im
     if callable(filt):
         return filt(im)
@@ -140,8 +141,7 @@ def discretize(im):
         Noise movie
     """
     im *= 255
-    ret = im.astype(np.uint8)
-    return ret
+    return im.astype(np.uint8, copy=False)
 
 def generate_frames(xsize, ysize, tsize, timepoints, levels=10, xyscale=.5, tscale=1, xscale=1.0, yscale=1.0, fps=30, seed=0):
     """Preprocess arguments before passing to the C implementation of Perlin noise.

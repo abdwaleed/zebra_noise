@@ -5,20 +5,35 @@ from .util import generate_frames, filter_frames_index_function, apply_filters, 
 from math import ceil
 import multiprocessing
 import concurrent.futures
+import threading
 
 def _generate_single_frame(args):
     """
     Top-level helper function required for multiprocessing.
-    Unpacks arguments, generates, filters, and discretizes a single frame.
+    Now includes a queue to signal completion asynchronously.
     """
-    _i, i, xsize, ysize, tsize, levels, xyscale, tscale, xscale, yscale, seed, filters = args
+    _i, i, xsize, ysize, tsize, levels, xyscale, tscale, xscale, yscale, seed, filters, q = args
     
     # Original generation logic
     frame = generate_frames(xsize, ysize, tsize, [i], levels=levels, xyscale=xyscale, tscale=tscale, xscale=xscale, yscale=yscale, seed=seed)
     filtered = apply_filters(frame[None], filters, frame_index=_i)[0] 
     disc = discretize(filtered[:,:,0])
     
+    # Send a tiny signal to the background thread that ONE frame is done
+    q.put(1)
+    
     return disc
+
+def _progress_bar_listener(q, total):
+    """
+    Background thread target that updates tqdm whenever a frame finishes,
+    regardless of chunking order.
+    """
+    pbar = tqdm(total=total, smoothing=0.1)
+    for _ in range(total):
+        q.get()  # Blocks until a core signals it finished a frame
+        pbar.update(1)
+    pbar.close()
 
 def zebra_noise(output_file, xsize, ysize, tdur, levels=10, xyscale=.2, tscale=50, fps=30, xscale=1.0, yscale=1.0, seed=0, filters=[("comb", 0.08)]):
     """Generate a .mp4 of zebra noise.
@@ -54,24 +69,45 @@ def zebra_noise(output_file, xsize, ysize, tdur, levels=10, xyscale=.2, tscale=5
     tsize = int(tdur * fps)
     tscale = tscale * (fps / 30)
     textra = (tscale - (tsize % tscale)) % tscale
+    
     if textra > 0:
-        warnings.warn(f"Adding {textra} extra timepoints to make tscale a multiple of tdur")  
+        warnings.warn(f"Adding {textra} extra timepoints to make tscale a multiple of tdur")
+        
     tsize += round(textra) if (textra % 1 < 1e-5) else ceil(textra)
     get_index = filter_frames_index_function(filters, tsize)
+    
     writer = imageio.get_writer(output_file, fps=fps)
     
-    # Maximize CPU usage, but leave 1 core free so the OS remains responsive
     num_cores = max(1, multiprocessing.cpu_count() - 1)
-    # Use a generator expression for arguments to prevent loading a massive list into RAM
+    
+    # MEMORY & UI OPTIMIZATION: Use a multiprocessing Manager to create a shared Queue
+    manager = multiprocessing.Manager()
+    progress_queue = manager.Queue()
+    
+    # This ensures the thread is killed instantly if the main program crashes, preventing terminal hangs.
+    progress_thread = threading.Thread(
+        target=_progress_bar_listener, 
+        args=(progress_queue, tsize), 
+        daemon=True
+    )
+    progress_thread.start()
+    
+    # Add the queue to our generator tasks
     tasks = (
-        (_i, get_index(_i), xsize, ysize, tsize, levels, xyscale, tscale, xscale, yscale, seed, filters)
+        (_i, get_index(_i), xsize, ysize, tsize, levels, xyscale, tscale, xscale, yscale, seed, filters, progress_queue)
         for _i in range(tsize)
     )
-    # ProcessPoolExecutor bypasses the GIL for true parallel computing
+    
     with concurrent.futures.ProcessPoolExecutor(max_workers=num_cores) as executor:
-        # Calculate a dynamic chunksize to minimize IPC (Inter-Process Communication) overhead
-        chunk_size = max(1, tsize // (num_cores * 4))
-        # executor.map guarantees results are yielded in the exact chronological order required for video writing
-        for disc in tqdm(executor.map(_generate_single_frame, tasks, chunksize=chunk_size), total=tsize):
-            writer.append_data(disc)   
+        # We cap the chunk_size at a maximum of 10. 
+        # This keeps CPU IPC overhead low, but strictly limits RAM usage no matter how long the video is.
+        chunk_size = min(10, max(1, tsize // (num_cores * 4)))
+        
+        # executor.map works silently at max speed while the thread handles UI
+        for disc in executor.map(_generate_single_frame, tasks, chunksize=chunk_size):
+            writer.append_data(disc)
+            
     writer.close()
+    
+    # Ensure the background thread closes out cleanly
+    progress_thread.join()
