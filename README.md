@@ -12,8 +12,8 @@ Zebranoise is a high-performance Python library designed to generate "zebra nois
 
 Because the core engine is written in C for maximum performance, your system **must have a C compiler installed** to build the package on your machine.
 
-* **Linux:** Ensure `gcc` is installed.
-* **Windows:** You must install the **Microsoft C++ Build Tools** (available via the Visual Studio Installer) with the "Desktop development with C++" workload selected.
+* **Linux:** For Ubuntu and Debian-Based Distributions, run `sudo apt update` then `sudo apt install build-essential`.
+* **Windows:** Install the **Microsoft C++ Build Tools** (available via the Visual Studio Installer) with the "Desktop development with C++" workload selected.
 * **Mac:** Run `xcode-select --install` and click Install.
 
 ### Standard Installation
